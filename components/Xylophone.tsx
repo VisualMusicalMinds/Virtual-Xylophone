@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { NOTES } from '../constants';
 import { Bar } from './Bar';
 import { NoteDefinition } from '../types';
@@ -6,16 +6,58 @@ import { NoteDefinition } from '../types';
 interface XylophoneProps {
   activeNoteId: string | null;
   onNotePlay: (note: NoteDefinition) => void;
+  accidentals: Record<string, 'sharp' | 'flat' | null>;
+  onToggleAccidental: (noteId: string, type: 'sharp' | 'flat') => void;
+  disabledNotes: Set<string>;
+  onToggleNoteEnabled: (noteId: string) => void;
 }
 
-export const Xylophone: React.FC<XylophoneProps> = ({ activeNoteId, onNotePlay }) => {
+export const Xylophone: React.FC<XylophoneProps> = ({ 
+  activeNoteId, 
+  onNotePlay, 
+  accidentals, 
+  onToggleAccidental,
+  disabledNotes,
+  onToggleNoteEnabled
+}) => {
+  const lastPlayedNoteId = useRef<string | null>(null);
   
   const handlePlay = (note: NoteDefinition) => {
     onNotePlay(note);
   };
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const noteElement = element?.closest('[data-note-id]');
+    
+    if (noteElement) {
+      const noteId = noteElement.getAttribute('data-note-id');
+      
+      // Only trigger if we've moved to a new note
+      if (noteId && noteId !== lastPlayedNoteId.current) {
+        lastPlayedNoteId.current = noteId;
+        const note = NOTES.find(n => n.id === noteId);
+        if (note) {
+          onNotePlay(note);
+        }
+      }
+    } else {
+      // Reset if we drag off the keys
+      lastPlayedNoteId.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    lastPlayedNoteId.current = null;
+  };
+
   return (
-    <div className="relative p-6 md:p-8 rounded-3xl bg-[#5d4037] shadow-[10px_10px_30px_rgba(0,0,0,0.5)] border-4 border-[#3e2723] w-full max-w-md landscape:max-w-5xl transition-all duration-300">
+    <div 
+      className="relative p-6 md:p-8 rounded-3xl bg-[#5d4037] shadow-[10px_10px_30px_rgba(0,0,0,0.5)] border-4 border-[#3e2723] w-full max-w-md landscape:max-w-5xl transition-all duration-300 touch-none"
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       
       {/* Background Rails (SVG) */}
       
@@ -46,6 +88,10 @@ export const Xylophone: React.FC<XylophoneProps> = ({ activeNoteId, onNotePlay }
             noteData={note}
             isActive={activeNoteId === note.id}
             onClick={handlePlay}
+            accidental={accidentals[note.id] || null}
+            onToggleAccidental={(type) => onToggleAccidental(note.id, type)}
+            isDisabled={disabledNotes.has(note.id)}
+            onToggleEnabled={() => onToggleNoteEnabled(note.id)}
           />
         ))}
       </div>
